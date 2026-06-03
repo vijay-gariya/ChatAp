@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Real-time Chat{% endblock %}
+
+{% block content %}
+<div class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 hover-lift">
+            <div class="text-center mb-8">
+                <div class="bg-gradient-to-r from-blue-500 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 hover-lift">
+                    <i data-lucide="log-in" class="w-8 h-8 text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+                <p class="text-slate-300">Sign in to continue chatting</p>
+            </div>
+
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-200 mb-2">
+                        Email Address
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="mail" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value="john@example.com"
+                            class="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/10"
+                            placeholder="Enter your email"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-200 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            value="password"
+                            class="w-full pl-12 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/10"
+                            placeholder="Enter your password"
+                            required
+                        />
+                        <button
+                            type="button"
+                            id="togglePassword"
+                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <i data-lucide="eye" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="hidden p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm"></div>
+
+                <button
+                    type="submit"
+                    id="loginButton"
+                    class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-lift"
+                >
+                    Sign In
+                </button>
+            </form>
+
+            <div class="text-center mt-6">
+                <p class="text-slate-300">
+                    Don't have an account?
+                    <a href="{{ url_for('register', room=room_id) if room_id else url_for('register') }}" class="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+                        Sign up
+                    </a>
+                </p>
+            </div>
+
+            <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                <p class="text-blue-200 text-sm font-medium mb-1">Demo Credentials:</p>
+                <p class="text-blue-300 text-xs">Email: john@example.com</p>
+                <p class="text-blue-300 text-xs">Password: password</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const loginButton = document.getElementById('loginButton');
+    const errorMessage = document.getElementById('errorMessage');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    // Toggle password visibility
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        
+        const icon = togglePassword.querySelector('i');
+        icon.setAttribute('data-lucide', type === 'password' ? 'eye' : 'eye-off');
+        lucide.createIcons();
+    });
+
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(loginForm);
+        const data = {
+            email: formData.get('email'),
+            password: formData.get('password')
+        };
+
+        loginButton.textContent = 'Signing In...';
+        loginButton.disabled = true;
+        errorMessage.classList.add('hidden');
+
+        try {
+            const response = await fetch(window.location.pathname + window.location.search, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.href = result.redirect || '/chat';
+            } else {
+                errorMessage.textContent = result.error || 'Login failed';
+                errorMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            errorMessage.textContent = 'Network error. Please try again.';
+            errorMessage.classList.remove('hidden');
+        } finally {
+            loginButton.textContent = 'Sign In';
+            loginButton.disabled = false;
+        }
+    });
+
+    // Initialize icons
+    lucide.createIcons();
+});
+</script>
+{% endblock %}

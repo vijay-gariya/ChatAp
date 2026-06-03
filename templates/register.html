@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Real-time Chat{% endblock %}
+
+{% block content %}
+<div class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 hover-lift">
+            <div class="text-center mb-8">
+                <div class="bg-gradient-to-r from-purple-500 to-pink-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 hover-lift">
+                    <i data-lucide="user-plus" class="w-8 h-8 text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-white mb-2">Join the Chat</h1>
+                <p class="text-slate-300">Create your account to get started</p>
+            </div>
+
+            <form id="registerForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-200 mb-2">
+                        Username
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            class="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:bg-white/10"
+                            placeholder="Choose a username"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-200 mb-2">
+                        Email Address
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="mail" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            class="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:bg-white/10"
+                            placeholder="Enter your email"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-200 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="w-full pl-12 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:bg-white/10"
+                            placeholder="Create a password"
+                            required
+                        />
+                        <button
+                            type="button"
+                            id="togglePassword"
+                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <i data-lucide="eye" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-200 mb-2">
+                        Confirm Password
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <input
+                            type="password"
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            class="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:bg-white/10"
+                            placeholder="Confirm your password"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="hidden p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm"></div>
+
+                <button
+                    type="submit"
+                    id="registerButton"
+                    class="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-purple-600 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-lift"
+                >
+                    Create Account
+                </button>
+            </form>
+
+            <div class="text-center mt-6">
+                <p class="text-slate-300">
+                    Already have an account?
+                    <a href="{{ url_for('login', room=room_id) if room_id else url_for('login') }}" class="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
+                        Sign in
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const registerForm = document.getElementById('registerForm');
+    const registerButton = document.getElementById('registerButton');
+    const errorMessage = document.getElementById('errorMessage');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+
+    // Toggle password visibility
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        confirmPasswordInput.setAttribute('type', type);
+        
+        const icon = togglePassword.querySelector('i');
+        icon.setAttribute('data-lucide', type === 'password' ? 'eye' : 'eye-off');
+        lucide.createIcons();
+    });
+
+    registerForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(registerForm);
+        const password = formData.get('password');
+        const confirmPassword = formData.get('confirmPassword');
+
+        if (password !== confirmPassword) {
+            errorMessage.textContent = 'Passwords do not match';
+            errorMessage.classList.remove('hidden');
+            return;
+        }
+
+        if (password.length < 6) {
+            errorMessage.textContent = 'Password must be at least 6 characters';
+            errorMessage.classList.remove('hidden');
+            return;
+        }
+
+        const data = {
+            username: formData.get('username'),
+            email: formData.get('email'),
+            password: password
+        };
+
+        registerButton.textContent = 'Creating Account...';
+        registerButton.disabled = true;
+        errorMessage.classList.add('hidden');
+
+        try {
+            const response = await fetch(window.location.pathname + window.location.search, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.href = result.redirect || '/chat';
+            } else {
+                errorMessage.textContent = result.error || 'Registration failed';
+                errorMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            errorMessage.textContent = 'Network error. Please try again.';
+            errorMessage.classList.remove('hidden');
+        } finally {
+            registerButton.textContent = 'Create Account';
+            registerButton.disabled = false;
+        }
+    });
+
+    // Initialize icons
+    lucide.createIcons();
+});
+</script>
+{% endblock %}
