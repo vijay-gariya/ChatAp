@@ -6,15 +6,19 @@ interface ChatHeaderProps {
   room: ChatRoom;
   onToggleSidebar?: () => void;
   showMenuButton?: boolean;
+  onVideoCall?: () => void;
+  onAudioCall?: () => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
   room,
   onToggleSidebar,
   showMenuButton = false,
+  onVideoCall,
+  onAudioCall,
 }) => {
   return (
-    <div className="border-b border-slate-700 p-6">
+    <div className="border-b border-slate-700 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           {showMenuButton && (
@@ -40,14 +44,26 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </div>
         
         <div className="flex items-center space-x-2">
+          {onAudioCall && (
+            <button 
+              onClick={onAudioCall}
+              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"
+              title="Audio call"
+            >
+              <Phone className="w-5 h-5" />
+            </button>
+          )}
+          {onVideoCall && (
+            <button 
+              onClick={onVideoCall}
+              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"
+              title="Video call"
+            >
+              <Video className="w-5 h-5" />
+            </button>
+          )}
           <button className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
             <Users className="w-5 h-5" />
-          </button>
-          <button className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
-            <Phone className="w-5 h-5" />
-          </button>
-          <button className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
-            <Video className="w-5 h-5" />
           </button>
           <button className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
             <MoreVertical className="w-5 h-5" />

@@ -278,7 +278,7 @@ class ChatApp {
         this.socket = io();
         this.currentRoom = null;
         this.initialRoomId = '{{ selected_room_id if selected_room_id else "" }}';
-        this.publicBaseUrl = '{{ public_base_url }}';
+        this.publicBaseUrl = {{ public_base_url | tojson }};
         this.currentUser = {
             id: {{ user.id }},
             username: '{{ user.username }}',
@@ -461,7 +461,7 @@ class ChatApp {
         }
 
         const isOwnMessage = message.userId === this.currentUser.id;
-        const messageTime = this.formatTime(new Date(message.timestamp));
+        const messageTime = this.formatTime(message.timestamp);
         
         const messageElement = document.createElement('div');
         messageElement.className = `flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4 message-enter`;
@@ -606,8 +606,25 @@ class ChatApp {
     async shareInviteLink() {
         if (!this.currentRoom) return;
 
-        const inviteUrl = `${this.publicBaseUrl}/invite/${encodeURIComponent(this.currentRoom)}`;
+        const inviteBaseUrl = this.publicBaseUrl || window.location.origin;
+        let inviteUrl = `${inviteBaseUrl}/invite/${encodeURIComponent(this.currentRoom)}`;
         try {
+            const response = await fetch(`/api/rooms/${this.currentRoom}/invite`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const payload = await response.json();
+                if (payload.token) {
+                    inviteUrl = `${inviteBaseUrl}/invite/token/${encodeURIComponent(payload.token)}`;
+                } else if (payload.invite_path) {
+                    inviteUrl = `${inviteBaseUrl}${payload.invite_path}`;
+                }
+            }
+
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(inviteUrl);
                 this.addSystemMessage('Invite link copied. Share it with your friend.');
@@ -690,17 +707,31 @@ class ChatApp {
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
     
-    formatTime(date) {
-        const now = new Date();
-        const localDate = new Date(date);
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const startOfMessageDay = new Date(localDate.getFullYear(), localDate.getMonth(), localDate.getDate());
-        const dayDiff = Math.round((startOfToday - startOfMessageDay) / 86400000);
+    formatTime(dateInput) {
+        // Accept Date or ISO string; parse robustly
+        let d;
+        if (!dateInput) return '';
+        if (typeof dateInput === 'string' || typeof dateInput === 'number') {
+            d = new Date(dateInput);
+        } else if (dateInput instanceof Date) {
+            d = dateInput;
+        } else {
+            d = new Date(dateInput);
+        }
 
-        const timeText = new Intl.DateTimeFormat('en-US', {
+        if (Number.isNaN(d.getTime())) return '';
+
+        // Use local date values
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfMessageDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const dayDiff = Math.floor((startOfToday - startOfMessageDay) / 86400000);
+
+        // Use user's locale for time formatting
+        const timeText = new Intl.DateTimeFormat(undefined, {
             hour: 'numeric',
             minute: '2-digit',
-        }).format(localDate);
+        }).format(d);
 
         if (dayDiff === 0) {
             return `Today at ${timeText}`;
@@ -710,7 +741,7 @@ class ChatApp {
             return `Yesterday at ${timeText}`;
         }
 
-        return `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(localDate)} at ${timeText}`;
+        return `${new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(d)} at ${timeText}`;
     }
     
     escapeHtml(text) {

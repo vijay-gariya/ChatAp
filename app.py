@@ -3,9 +3,10 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import socket
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,6 +25,14 @@ login_manager.login_view = 'login'
 # Track each connected socket's active room for presence updates.
 active_socket_rooms = {}
 active_socket_users = {}
+
+
+# Membership and invite support so a shared link can join a room.
+room_members = db.Table(
+    'room_members',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('room_id', db.Integer, db.ForeignKey('chat_room.id'), primary_key=True)
+)
 
 
 def to_utc_iso(value):
@@ -54,6 +63,35 @@ class ChatRoom(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     messages = db.relationship('Message', backref='room', lazy=True)
+    members = db.relationship('User', secondary=room_members, backref=db.backref('rooms', lazy='dynamic'))
+
+
+class Invite(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('chat_room.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    max_uses = db.Column(db.Integer, default=0)
+    uses = db.Column(db.Integer, default=0)
+
+    room = db.relationship('ChatRoom', backref=db.backref('invites', lazy=True))
+    creator = db.relationship('User', backref=db.backref('created_invites', lazy=True))
+
+
+class RoomAccess(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey('chat_room.id'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('room_accesses', lazy=True))
+    room = db.relationship('ChatRoom', backref=db.backref('access_entries', lazy=True))
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'room_id', name='uq_room_access_user_room'),
+    )
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -67,71 +105,184 @@ class Message(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+
+def create_invite(room_id, created_by=None, expires_minutes=24 * 60, max_uses=0):
+    token = uuid.uuid4().hex
+    invite = Invite(
+        token=token,
+        room_id=room_id,
+        created_by=created_by,
+        expires_at=(datetime.utcnow() + timedelta(minutes=expires_minutes)) if expires_minutes else None,
+        max_uses=max_uses,
+    )
+    db.session.add(invite)
+    db.session.commit()
+    return invite
+
+
+def ensure_room_access(user, room, joined_at=None):
+    access = RoomAccess.query.filter_by(user_id=user.id, room_id=room.id).first()
+    if access:
+        return access
+
+    access = RoomAccess(
+        user_id=user.id,
+        room_id=room.id,
+        joined_at=joined_at or datetime.utcnow(),
+    )
+    db.session.add(access)
+    return access
+
+
+def use_invite_token(token, user):
+    invite = Invite.query.filter_by(token=token).first()
+    if not invite:
+        return None
+
+    if invite.expires_at and invite.expires_at < datetime.utcnow():
+        return None
+
+    if invite.max_uses and invite.uses >= invite.max_uses:
+        return None
+
+    room = ChatRoom.query.get(invite.room_id)
+    if not room:
+        return None
+
+    if user not in room.members:
+        room.members.append(user)
+
+    ensure_room_access(user, room)
+
+    invite.uses += 1
+    db.session.commit()
+    return room
+
 # Routes
 @app.route('/')
 def index():
     if current_user.is_authenticated:
         return redirect(url_for('chat'))
-    return redirect(url_for('login'))
+
+    return redirect(url_for('register'))
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     room_id = request.args.get('room', type=int)
+    invite_token = request.args.get('invite_token')
 
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
-        email = data.get('email', '').strip()
+
+        email = data.get('email', '').strip().lower()
         password = data.get('password', '')
-        
+
+        if not email or not password:
+            return jsonify({
+                'success': False,
+                'error': 'Email and password are required'
+            })
+
         user = User.query.filter_by(email=email).first()
-        
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            user.is_online = True
-            db.session.commit()
-            redirect_url = url_for('chat', room=room_id) if room_id else url_for('chat')
-            return jsonify({'success': True, 'redirect': redirect_url})
-        else:
-            return jsonify({'success': False, 'error': 'Invalid credentials'})
-    
-    return render_template('login.html', room_id=room_id)
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Account not found. Please register first.'
+            })
+
+        if not check_password_hash(user.password_hash, password):
+            return jsonify({
+                'success': False,
+                'error': 'Incorrect password'
+            })
+
+        login_user(user)
+
+        user.is_online = True
+        db.session.commit()
+
+        if invite_token:
+            use_invite_token(invite_token, user)
+
+        redirect_url = (
+            url_for('chat', room=room_id)
+            if room_id else
+            url_for('chat')
+        )
+
+        return jsonify({
+            'success': True,
+            'redirect': redirect_url
+        })
+
+    return render_template(
+        'login.html',
+        room_id=room_id
+    )
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     room_id = request.args.get('room', type=int)
+    invite_token = request.args.get('invite_token')
 
     if request.method == 'POST':
+
         data = request.get_json(silent=True) or {}
+
         username = data.get('username', '').strip()
-        email = data.get('email', '').strip()
+        email = data.get('email', '').strip().lower()
         password = data.get('password', '')
 
+        if len(username) < 3:
+            return jsonify({
+                'success': False,
+                'error': 'Username must be at least 3 characters'
+            })
+
         if len(password) < 6:
-            return jsonify({'success': False, 'error': 'Password must be at least 6 characters'})
-        
+            return jsonify({
+                'success': False,
+                'error': 'Password must be at least 6 characters'
+            })
+
         if User.query.filter_by(email=email).first():
-            return jsonify({'success': False, 'error': 'Email already exists'})
-        
+            return jsonify({
+                'success': False,
+                'error': 'Email already registered'
+            })
+
         if User.query.filter_by(username=username).first():
-            return jsonify({'success': False, 'error': 'Username already exists'})
-        
-        user = User(
+            return jsonify({
+                'success': False,
+                'error': 'Username already exists'
+            })
+
+        new_user = User(
             username=username,
             email=email,
             password_hash=generate_password_hash(password)
         )
-        
-        db.session.add(user)
+
+        db.session.add(new_user)
         db.session.commit()
-        
-        login_user(user)
-        user.is_online = True
-        db.session.commit()
-        
-        redirect_url = url_for('chat', room=room_id) if room_id else url_for('chat')
-        return jsonify({'success': True, 'redirect': redirect_url})
-    
-    return render_template('register.html', room_id=room_id)
+
+        redirect_args = {}
+        if room_id:
+            redirect_args['room'] = room_id
+        if invite_token:
+            redirect_args['invite_token'] = invite_token
+
+        return jsonify({
+            'success': True,
+            'redirect': url_for('login', **redirect_args) if redirect_args else url_for('login')
+        })
+
+    return render_template(
+        'register.html',
+        room_id=room_id
+    )
 
 
 @app.route('/invite/<int:room_id>')
@@ -140,9 +291,12 @@ def register():
 @app.route('/join/<int:room_id>')
 def invite(room_id):
     room = ChatRoom.query.get_or_404(room_id)
+    invite = create_invite(room.id, created_by=current_user.id if current_user.is_authenticated else None)
+
     if current_user.is_authenticated:
-        return redirect(url_for('chat', room=room.id))
-    return redirect(url_for('register', room=room.id))
+        return redirect(url_for('invite_token', token=invite.token))
+
+    return redirect(url_for('register', room=room.id, invite_token=invite.token))
 
 
 @app.route('/invite')
@@ -155,13 +309,41 @@ def invite_with_query():
         return redirect(url_for('chat') if current_user.is_authenticated else url_for('login'))
     return redirect(url_for('invite', room_id=room_id))
 
+
+@app.route('/invite/token/<string:token>')
+def invite_token(token):
+    invite = Invite.query.filter_by(token=token).first_or_404()
+    room = ChatRoom.query.get_or_404(invite.room_id)
+
+    if current_user.is_authenticated:
+        use_invite_token(token, current_user)
+        return redirect(url_for('chat', room=room.id))
+
+    return redirect(url_for('register', room=room.id, invite_token=token, next='chat'))
+
+
+@app.route('/api/rooms/<int:room_id>/invite', methods=['POST'])
+@login_required
+def create_room_invite(room_id):
+    room = ChatRoom.query.get_or_404(room_id)
+    invite = create_invite(room.id, created_by=current_user.id)
+    return jsonify({
+        'invite_path': url_for('invite_token', token=invite.token),
+        'token': invite.token,
+        'room_id': room.id,
+    })
+
 @app.route('/chat')
 @login_required
 def chat():
-    rooms = ChatRoom.query.all()
+    rooms = ChatRoom.query.filter((ChatRoom.is_private == False) | (ChatRoom.members.any(id=current_user.id))).all()
     selected_room_id = request.args.get('room', type=int)
-    if selected_room_id and not ChatRoom.query.get(selected_room_id):
-        selected_room_id = None
+    if selected_room_id:
+        selected_room = ChatRoom.query.get(selected_room_id)
+        if not selected_room:
+            selected_room_id = None
+        elif selected_room.is_private and current_user not in selected_room.members:
+            selected_room_id = None
 
     public_base_url = os.getenv('PUBLIC_BASE_URL', '').strip()
     if not public_base_url:
@@ -204,7 +386,22 @@ def logout():
 @app.route('/api/messages/<int:room_id>')
 @login_required
 def get_messages(room_id):
-    messages = Message.query.filter_by(room_id=room_id).order_by(Message.timestamp.asc()).all()
+    room = ChatRoom.query.get_or_404(room_id)
+    if room.is_private and current_user not in room.members:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    room_access = ensure_room_access(current_user, room)
+    if room_access in db.session.new:
+        db.session.commit()
+
+    cutoff_time = room_access.joined_at or room.created_at or datetime.utcnow()
+
+    messages = (
+        Message.query
+        .filter(Message.room_id == room_id, Message.timestamp >= cutoff_time)
+        .order_by(Message.timestamp.asc())
+        .all()
+    )
     return jsonify([{
         'id': msg.id,
         'content': msg.content,
@@ -218,7 +415,9 @@ def get_messages(room_id):
 @app.route('/api/rooms/<int:room_id>/members')
 @login_required
 def get_room_members(room_id):
-    ChatRoom.query.get_or_404(room_id)
+    room = ChatRoom.query.get_or_404(room_id)
+    if room.is_private and current_user not in room.members:
+        return jsonify({'error': 'Forbidden'}), 403
 
     active_user_ids = {
         user_id
@@ -280,6 +479,10 @@ def on_join_room(data):
     room = ChatRoom.query.get(room_id)
     if not room:
         emit('room_error', {'error': 'Room not found'})
+        return
+
+    if room.is_private and current_user not in room.members:
+        emit('room_error', {'error': 'You do not have access to this room'})
         return
 
     previous_room = active_socket_rooms.get(request.sid)
@@ -367,25 +570,57 @@ def init_db():
             for room in rooms:
                 db.session.add(room)
             
-            # Create demo user
-            demo_user = User(
-                username='john_doe',
-                email='john@example.com',
-                password_hash=generate_password_hash('password'),
-                avatar='https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150'
-            )
-            db.session.add(demo_user)
+            # Ensure demo user exists (create or update)
+            demo_email = 'vjysingh@example.com'
+            demo_user = User.query.filter_by(email=demo_email).first()
+            if demo_user:
+                demo_user.username = 'VjySingh'
+                demo_user.avatar = '/static/images/vijay.jpg'
+                # keep existing password if present, otherwise set default
+                if not demo_user.password_hash:
+                    demo_user.password_hash = generate_password_hash('password')
+            else:
+                demo_user = User(
+                    username='VjySingh',
+                    email=demo_email,
+                    password_hash=generate_password_hash('password'),
+                    avatar='/static/images/vijay.jpg'
+                )
+                db.session.add(demo_user)
             db.session.commit()
-            
-            # Add demo messages
-            demo_messages = [
-                Message(content='Hey everyone! Welcome to the chat!', user_id=demo_user.id, room_id=1),
-                Message(content='This chat app looks amazing!', user_id=demo_user.id, room_id=1)
-            ]
-            
-            for msg in demo_messages:
-                db.session.add(msg)
-            
+
+            # Add demo messages if none exist for this user in room 1
+            existing = Message.query.filter_by(user_id=demo_user.id, room_id=1).first()
+            if not existing:
+                demo_messages = [
+                    Message(content='Hey everyone! Welcome to the chat!', user_id=demo_user.id, room_id=1),
+                    Message(content='This chat app looks amazing!', user_id=demo_user.id, room_id=1)
+                ]
+                for msg in demo_messages:
+                    db.session.add(msg)
+                db.session.commit()
+
+        # Backfill room access rows for existing members so current users keep their history.
+        existing_access = {
+            (access.user_id, access.room_id)
+            for access in RoomAccess.query.all()
+        }
+
+        for room in ChatRoom.query.all():
+            for member in room.members:
+                key = (member.id, room.id)
+                if key in existing_access:
+                    continue
+
+                db.session.add(
+                    RoomAccess(
+                        user_id=member.id,
+                        room_id=room.id,
+                        joined_at=room.created_at or datetime.utcnow(),
+                    )
+                )
+
+        if db.session.new:
             db.session.commit()
 
 if __name__ == '__main__':

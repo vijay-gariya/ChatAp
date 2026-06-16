@@ -34,11 +34,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
       
+
       <div className={`${
         isMobile 
           ? 'fixed left-0 top-0 h-full z-50 transform transition-transform duration-300' + (isOpen ? ' translate-x-0' : ' -translate-x-full')
           : 'relative'
-      } w-80 bg-slate-800 border-r border-slate-700 flex flex-col`}>
+      } w-full md:w-80 bg-slate-800 border-r border-slate-700 flex flex-col`}>
         
         {/* User Profile */}
         <div className="p-6 border-b border-slate-700">

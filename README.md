@@ -150,6 +150,44 @@ The application is fully responsive and works great on:
 - Mobile phones
 - All modern browsers
 
+## 🌐 Public Invite Links
+
+If you want someone to join from outside your Wi-Fi network, you need a public URL. A local address like `http://127.0.0.1:5000` will only work on your own machine.
+
+### Option 1: Use your LAN IP
+If the other person is on the same Wi-Fi, start the app and share the IP address shown in the Flask console, for example:
+```text
+http://172.20.10.3:5000
+```
+
+### Option 2: Use ngrok for public access
+1. Start the app:
+```bash
+python app.py
+```
+
+2. In another terminal, expose port 5000 with ngrok:
+```bash
+ngrok http 5000
+```
+
+3. ngrok will give you a public HTTPS URL like:
+```text
+https://abcd-1234.ngrok-free.app
+```
+
+4. Set `PUBLIC_BASE_URL` to that URL in your `.env` file so invite links use the public address:
+```env
+PUBLIC_BASE_URL=https://abcd-1234.ngrok-free.app
+```
+
+5. Restart the Flask app and share the invite link from the chat room.
+
+### Notes
+- The invite link must be opened from the same public URL that your app is using.
+- If `PUBLIC_BASE_URL` is not set, the app falls back to the current browser origin.
+- For people outside your network, ngrok or another tunnel is required.
+
 ## 🎨 Customization
 
 ### Colors & Themes

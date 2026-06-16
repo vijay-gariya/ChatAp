@@ -6,146 +6,219 @@
 <div class="min-h-screen gradient-bg flex items-center justify-center p-4">
     <div class="w-full max-w-md">
         <div class="glass-effect rounded-2xl shadow-2xl p-8 hover-lift">
+
+            <!-- Header -->
             <div class="text-center mb-8">
-                <div class="bg-gradient-to-r from-blue-500 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 hover-lift">
+                <div class="bg-gradient-to-r from-blue-500 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <i data-lucide="log-in" class="w-8 h-8 text-white"></i>
                 </div>
-                <h1 class="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-                <p class="text-slate-300">Sign in to continue chatting</p>
+
+                <h1 class="text-3xl font-bold text-white mb-2">
+                    Welcome Back
+                </h1>
+
+                <p class="text-slate-300">
+                    Sign in to enter Vjy's Chat Room
+                </p>
             </div>
 
-            <form id="loginForm" class="space-y-6">
+            <!-- Form -->
+            <form id="loginForm" class="space-y-5">
+
+                <!-- Email -->
                 <div>
                     <label class="block text-sm font-medium text-slate-200 mb-2">
                         Email Address
                     </label>
+
                     <div class="relative">
-                        <i data-lucide="mail" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <i data-lucide="mail"
+                           class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+
                         <input
                             type="email"
                             id="email"
                             name="email"
-                            value="john@example.com"
-                            class="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/10"
+                            class="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter your email"
-                            required
-                        />
+                            required>
                     </div>
                 </div>
 
+                <!-- Password -->
                 <div>
                     <label class="block text-sm font-medium text-slate-200 mb-2">
                         Password
                     </label>
+
                     <div class="relative">
-                        <i data-lucide="lock" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+                        <i data-lucide="lock"
+                           class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5"></i>
+
                         <input
                             type="password"
                             id="password"
                             name="password"
-                            value="password"
-                            class="w-full pl-12 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/10"
+                            class="w-full pl-12 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter your password"
-                            required
-                        />
+                            required>
+
                         <button
                             type="button"
                             id="togglePassword"
-                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                        >
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+
                             <i data-lucide="eye" class="w-5 h-5"></i>
                         </button>
                     </div>
                 </div>
 
-                <div id="errorMessage" class="hidden p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm"></div>
+                <!-- Remember Me -->
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2 text-slate-300 text-sm">
+                        <input
+                            type="checkbox"
+                            id="rememberMe"
+                            class="rounded">
 
+                        Remember Me
+                    </label>
+
+                    <a href="#"
+                       class="text-blue-400 hover:text-blue-300 text-sm">
+                        Forgot Password?
+                    </a>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage"
+                     class="hidden p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm">
+                </div>
+
+                <!-- Login Button -->
                 <button
                     type="submit"
                     id="loginButton"
-                    class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-lift"
-                >
+                    class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all">
+
                     Sign In
                 </button>
+
             </form>
 
+            <!-- Register Link -->
             <div class="text-center mt-6">
                 <p class="text-slate-300">
                     Don't have an account?
-                    <a href="{{ url_for('register', room=room_id) if room_id else url_for('register') }}" class="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-                        Sign up
+
+                    <a href="{{ url_for('register') }}"
+                       class="text-blue-400 hover:text-blue-300 font-semibold">
+
+                        Create Account
                     </a>
                 </p>
             </div>
 
-            <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                <p class="text-blue-200 text-sm font-medium mb-1">Demo Credentials:</p>
-                <p class="text-blue-300 text-xs">Email: john@example.com</p>
-                <p class="text-blue-300 text-xs">Password: password</p>
-            </div>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.getElementById('loginForm');
-    const loginButton = document.getElementById('loginButton');
-    const errorMessage = document.getElementById('errorMessage');
-    const togglePassword = document.getElementById('togglePassword');
-    const passwordInput = document.getElementById('password');
 
-    // Toggle password visibility
-    togglePassword.addEventListener('click', function() {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        
-        const icon = togglePassword.querySelector('i');
-        icon.setAttribute('data-lucide', type === 'password' ? 'eye' : 'eye-off');
-        lucide.createIcons();
+document.addEventListener('DOMContentLoaded', () => {
+
+    const form = document.getElementById('loginForm');
+    const errorBox = document.getElementById('errorMessage');
+    const loginButton = document.getElementById('loginButton');
+
+    const passwordInput =
+        document.getElementById('password');
+
+    // Show / Hide Password
+    document.getElementById('togglePassword')
+    .addEventListener('click', () => {
+
+        const type =
+            passwordInput.type === 'password'
+            ? 'text'
+            : 'password';
+
+        passwordInput.type = type;
     });
 
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(loginForm);
-        const data = {
-            email: formData.get('email'),
-            password: formData.get('password')
-        };
+    // Login Submit
+    form.addEventListener('submit', async (e) => {
 
-        loginButton.textContent = 'Signing In...';
+        e.preventDefault();
+
+        errorBox.classList.add('hidden');
+
+        const email =
+            document.getElementById('email').value.trim();
+
+        const password =
+            document.getElementById('password').value;
+
+        const rememberMe =
+            document.getElementById('rememberMe').checked;
+
         loginButton.disabled = true;
-        errorMessage.classList.add('hidden');
+        loginButton.innerText = "Signing In...";
 
         try {
-            const response = await fetch(window.location.pathname + window.location.search, {
+
+            const response = await fetch(`${window.location.pathname}${window.location.search}`, {
+
                 method: 'POST',
+
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(data)
+
+                body: JSON.stringify({
+                    email,
+                    password,
+                    rememberMe
+                })
             });
 
             const result = await response.json();
 
-            if (result.success) {
-                window.location.href = result.redirect || '/chat';
+            if(result.success){
+
+                window.location.href =
+                    result.redirect || "/chat";
+
             } else {
-                errorMessage.textContent = result.error || 'Login failed';
-                errorMessage.classList.remove('hidden');
+
+                showError(
+                    result.error ||
+                    "Invalid email or password."
+                );
             }
-        } catch (error) {
-            errorMessage.textContent = 'Network error. Please try again.';
-            errorMessage.classList.remove('hidden');
+
+        } catch(error){
+
+            showError(
+                "Unable to connect to server. Please try again."
+            );
+
         } finally {
-            loginButton.textContent = 'Sign In';
+
             loginButton.disabled = false;
+            loginButton.innerText = "Sign In";
         }
     });
 
-    // Initialize icons
+    function showError(message){
+
+        errorBox.textContent = message;
+        errorBox.classList.remove('hidden');
+    }
+
     lucide.createIcons();
 });
+
 </script>
+
 {% endblock %}
